@@ -1,8 +1,8 @@
 # SOLMAR BAY — Make GTA 6 (make.fun gta6-01)
 
 ![make.fun](https://make.fun/badge/gta6-01.svg)
-![rank](https://make.fun/badge/uzytry/gta6-01-entry/rank.svg)
-![reward](https://make.fun/badge/uzytry/gta6-01-entry/reward.svg)
+![rank](https://make.fun/badge/gta6-01/uzytry/gta6-01-entry/rank.svg)
+![reward](https://make.fun/badge/gta6-01/uzytry/gta6-01-entry/reward.svg)
 
 An original open-world crime game in the spirit of GTA 6, built for the
 [make.fun "Make GTA 6" bounty](https://make.fun/bounty/gta6-01). It plays
