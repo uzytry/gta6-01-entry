@@ -33,9 +33,9 @@ function facadeTexture(base, lit) {
 
 function roadTexture() {
   const texture = canvasTexture(128, (g) => {
-    g.fillStyle = '#33373d';
+    g.fillStyle = '#565b64';
     g.fillRect(0, 0, 128, 128);
-    g.fillStyle = '#3d4148';
+    g.fillStyle = '#606570';
     for (let i = 0; i < 300; i += 1) {
       g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
     }
@@ -76,8 +76,8 @@ export function buildCity(scene, rng) {
 
   // --- Sky, sun, fog -------------------------------------------------------
   scene.background = new THREE.Color(0x87b5e0);
-  scene.fog = new THREE.Fog(0x9cc0dd, 180, 700);
-  const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 0.9);
+  scene.fog = new THREE.Fog(0xbfd9ef, 260, 1000);
+  const hemi = new THREE.HemisphereLight(0xbfd9ff, 0x8a7a5a, 1.05);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff2d0, 2.2);
   sun.position.set(180, 260, 120);
@@ -94,6 +94,11 @@ export function buildCity(scene, rng) {
   sunTarget.position.set(0, 0, 0);
   scene.add(sunTarget);
   sun.target = sunTarget;
+  // A soft fill from the opposite side so shadowed faces (the road in a
+  // tower's shadow at morning) stay readable instead of near-black.
+  const fill = new THREE.DirectionalLight(0xdfe8ff, 0.55);
+  fill.position.set(-200, 180, -120);
+  scene.add(fill);
 
   // --- Ground, beach, water -------------------------------------------------
   const groundMat = new THREE.MeshLambertMaterial({ color: 0x6f8f5a });
@@ -166,12 +171,12 @@ export function buildCity(scene, rng) {
 
   // --- Buildings ------------------------------------------------------------
   const facades = [
-    facadeTexture('#c8b8a0', 0.25),
-    facadeTexture('#a8b8c8', 0.3),
-    facadeTexture('#d8c8b0', 0.2),
-    facadeTexture('#b8a8c8', 0.25),
-    facadeTexture('#8fa8b8', 0.35),
-    facadeTexture('#c8c8c8', 0.2),
+    facadeTexture('#c8b8a0', 0.35),
+    facadeTexture('#a8b8c8', 0.38),
+    facadeTexture('#d8c8b0', 0.3),
+    facadeTexture('#b8a8c8', 0.35),
+    facadeTexture('#8fa8b8', 0.42),
+    facadeTexture('#c8c8c8', 0.3),
   ];
   const roofMat = new THREE.MeshLambertMaterial({ color: 0x5a5a60 });
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -209,7 +214,7 @@ export function buildCity(scene, rng) {
         // Parking lot: flat asphalt with parked-car spots.
         const lot = new THREE.Mesh(
           new THREE.PlaneGeometry(gap, gap),
-          new THREE.MeshLambertMaterial({ color: 0x3a3d42 }),
+          new THREE.MeshLambertMaterial({ color: 0x484c53 }),
         );
         lot.rotation.x = -Math.PI / 2;
         lot.position.set(cx, 0.03, cz);

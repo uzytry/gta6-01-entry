@@ -13,6 +13,16 @@ You are Maya "Vex" Rios, the best getaway driver on the bay. Five story
 missions for Sal Marlow and Dante Faro, a living city, and the SBPD on your
 tail.
 
+## Screenshots
+
+Real renders of the game running in a browser (title, driving, police
+roadblock chase, Bay Heist firefight):
+
+![Title screen](screenshots/1-start.jpg)
+![Driving downtown](screenshots/2-drive.jpg)
+![Police roadblock chase](screenshots/3-chase.jpg)
+![Bay Heist firefight](screenshots/4-mission.jpg)
+
 ## Play it
 
 ```sh

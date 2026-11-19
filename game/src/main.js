@@ -42,11 +42,52 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.12;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1200);
 camera.position.set(-40, 6, -140);
+
+// --- Sky dome + sun disc ----------------------------------------------------
+// A gradient sky dome (top colour to horizon colour) and a visible sun disc,
+// so the city reads as sun-soaked instead of a flat-colour sky. The dome is
+// BackSide and ignores fog; the disc rides on the sun direction each frame.
+const skyDomeMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  fog: false,
+  uniforms: {
+    topColor: { value: new THREE.Color(0x3f7fd0) },
+    horizonColor: { value: new THREE.Color(0xc4dcf2) },
+  },
+  vertexShader: `varying vec3 vDir;
+    void main() {
+      vDir = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `uniform vec3 topColor;
+    uniform vec3 horizonColor;
+    varying vec3 vDir;
+    void main() {
+      float h = normalize(vDir).y;
+      float t = pow(max(h, 0.0), 0.55);
+      vec3 col = mix(horizonColor, topColor, t);
+      if (h < 0.0) col = horizonColor;
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+});
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(950, 24, 16), skyDomeMat);
+scene.add(skyDome);
+const sunDisc = new THREE.Mesh(
+  new THREE.CircleGeometry(40, 24),
+  new THREE.MeshBasicMaterial({ color: 0xfff3c0, fog: false, transparent: true, opacity: 0.95 }),
+);
+scene.add(sunDisc);
+const sunGlow = new THREE.Mesh(
+  new THREE.CircleGeometry(110, 24),
+  new THREE.MeshBasicMaterial({ color: 0xffe9a0, fog: false, transparent: true, opacity: 0.22 }),
+);
+scene.add(sunGlow);
 
 const rng = createRandom(seed);
 const world = {
@@ -80,17 +121,52 @@ const daySky = new THREE.Color(0x87b5e0);
 const duskSky = new THREE.Color(0xe8a06a);
 const nightSky = new THREE.Color(0x1a2438);
 const skyColor = new THREE.Color();
+// Dome palettes: [top, horizon] for day, dusk and night.
+const dayTop = new THREE.Color(0x3f7fd0);
+const dayHorizon = new THREE.Color(0xc4dcf2);
+const duskTop = new THREE.Color(0x6a5588);
+const duskHorizon = new THREE.Color(0xf2a56b);
+const nightTop = new THREE.Color(0x0b1220);
+const nightHorizon = new THREE.Color(0x1c2a44);
+const skyTop = new THREE.Color();
+const skyHorizon = new THREE.Color();
 function updateDayNight() {
   const frac = (world.time % WORLD.DAY_LENGTH) / WORLD.DAY_LENGTH;
-  const angle = frac * Math.PI * 2;
+  // The clock starts at 09:00, so the sun cycle is offset to match it:
+  // 09:00 is a bright morning sun, sunset lands near 18:30, night 21:00-05:00.
+  const angle = frac * Math.PI * 2 + 0.58;
   const sunH = Math.sin(angle);
   world.city.sun.position.set(Math.cos(angle) * 260, 60 + sunH * 240, 120);
   world.city.sun.intensity = sunH > -0.1 ? 2.2 : 0.4;
-  if (sunH > 0.25) skyColor.copy(daySky);
-  else if (sunH > -0.15) skyColor.copy(daySky).lerp(duskSky, (0.25 - sunH) / 0.4);
-  else skyColor.copy(duskSky).lerp(nightSky, Math.min(1, (-0.15 - sunH) / 0.4));
+  if (sunH > 0.25) {
+    skyColor.copy(daySky);
+    skyTop.copy(dayTop);
+    skyHorizon.copy(dayHorizon);
+  } else if (sunH > -0.15) {
+    const t = (0.25 - sunH) / 0.4;
+    skyColor.copy(daySky).lerp(duskSky, t);
+    skyTop.copy(dayTop).lerp(duskTop, t);
+    skyHorizon.copy(dayHorizon).lerp(duskHorizon, t);
+  } else {
+    const t = Math.min(1, (-0.15 - sunH) / 0.4);
+    skyColor.copy(duskSky).lerp(nightSky, t);
+    skyTop.copy(duskTop).lerp(nightTop, t);
+    skyHorizon.copy(duskHorizon).lerp(nightHorizon, t);
+  }
   scene.background = skyColor;
   scene.fog.color.copy(skyColor);
+  skyDomeMat.uniforms.topColor.value.copy(skyTop);
+  skyDomeMat.uniforms.horizonColor.value.copy(skyHorizon);
+  // Sun disc + glow ride on the sun direction, far enough to sit on the dome.
+  const sunDir = world.city.sun.position.clone().normalize();
+  const discPos = camera.position.clone().addScaledVector(sunDir, 880);
+  sunDisc.position.copy(discPos);
+  sunDisc.lookAt(camera.position);
+  sunGlow.position.copy(discPos);
+  sunGlow.lookAt(camera.position);
+  const sunVisible = sunH > -0.08;
+  sunDisc.visible = sunVisible;
+  sunGlow.visible = sunVisible;
 }
 
 // --- One fixed step of the living world -------------------------------------
@@ -132,9 +208,12 @@ function stepWorld(dt, input, actions) {
   }
 }
 
-function renderFrame() {
+function renderFrame(dt) {
   renderer.render(scene, camera);
-  world.hud.update(0);
+  // The HUD gets the real frame time: the damage flash only decays when dt
+  // is real (it used to be called with 0, so one hit left the screen
+  // red-tinted for the rest of the game).
+  world.hud.update(dt || 0);
 }
 
 // --- Screens ----------------------------------------------------------------
@@ -220,6 +299,7 @@ world.hud.on('toggleMap', () => {
 function runShot(name) {
   const sceneInfo = stageShot(name, world);
   screen = sceneInfo.screen;
+  world.shotMode = true;
   if (screen === 'title') {
     world.hud.showTitle(false);
   } else {
@@ -230,7 +310,20 @@ function runShot(name) {
   function frame() {
     while (stepped < sceneInfo.steps) {
       stepWorld(STEP, sceneInfo.input, 0);
+      // Self-driving extra cars (traffic, a flanking cruiser) hold their
+      // target speed on a straight road beside the staged action.
+      for (const extra of sceneInfo.extras || []) {
+        extra.car.update(STEP, {
+          throttle: extra.car.speed < extra.targetSpeed ? 0.8 : 0,
+          steer: 0,
+          brake: 0,
+        }, world);
+        // A staged siren's lightbar stays lit for the frame, whatever the
+        // blink phase at this exact game time is.
+        if (extra.car.mesh.userData.lightBar) extra.car.mesh.userData.lightBar.visible = true;
+      }
       stepped += 1;
+      if (sceneInfo.onStep) sceneInfo.onStep(stepped, world);
     }
     if (screen === 'title') {
       titleOrbit += 0.002;
@@ -240,6 +333,9 @@ function runShot(name) {
       world.peds.update(STEP, 0, 0);
       world.effects.update(STEP);
     }
+    // Let the damage flash settle before the frame is taken: a firefight
+    // shot should show the fight, not a red wash over it.
+    world.hud.update(3);
     renderFrame();
     painted += 1;
     if (painted < 3) requestAnimationFrame(frame);
@@ -277,13 +373,13 @@ function runGame() {
       world.effects.update(dt);
       updateDayNight();
       if (actions & (ACTION_CONFIRM | ACTION_ENTER)) startNewGame();
-      renderFrame();
+      renderFrame(dt);
       return;
     }
 
     if (screen === 'wasted') {
       if (actions & (ACTION_CONFIRM | ACTION_ENTER)) handleWastedConfirm();
-      renderFrame();
+      renderFrame(dt);
       return;
     }
     if (screen === 'busted') {
@@ -292,7 +388,7 @@ function runGame() {
         world.hud.hideAllOverlays();
         world.input.lockPointer();
       }
-      renderFrame();
+      renderFrame(dt);
       return;
     }
 
@@ -301,7 +397,7 @@ function runGame() {
       else if (screen === 'paused') resumeGame();
     }
     if (screen === 'paused') {
-      renderFrame();
+      renderFrame(dt);
       return;
     }
 
@@ -311,7 +407,7 @@ function runGame() {
     }
     if (actions & ACTION_SAVE) world.save.save();
     if (mapOpen) {
-      renderFrame();
+      renderFrame(dt);
       return;
     }
     accumulator += dt;
@@ -333,7 +429,7 @@ function runGame() {
       }
       if (screen !== 'play') break;
     }
-    renderFrame();
+    renderFrame(dt);
   }
   requestAnimationFrame(frame);
 }

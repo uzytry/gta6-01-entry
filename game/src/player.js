@@ -231,8 +231,15 @@ export function createPlayer(world, startX, startZ) {
     const tx = state.x;
     const tz = state.z;
     const ty = (state.vehicle ? state.vehicle.y : state.y) + 1.6;
-    const wantX = tx - fx * dist;
-    const wantZ = tz - fz * dist;
+    let wantX = tx - fx * dist;
+    let wantZ = tz - fz * dist;
+    // Shot staging: a sideways camera offset (chase shot) so a cruiser
+    // ramming from behind shows beside the player's car, not over it.
+    const side = world.shotCamSide || 0;
+    if (side !== 0) {
+      wantX += Math.cos(state.camYaw) * side;
+      wantZ += -Math.sin(state.camYaw) * side;
+    }
     const wantY = ty + height - state.camPitch * 6;
     const k = 1 - Math.pow(0.0001, dt);
     camera.position.x += (wantX - camera.position.x) * k;

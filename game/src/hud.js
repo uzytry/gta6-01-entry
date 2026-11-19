@@ -257,9 +257,10 @@ export function createHUD(world) {
           speed.parentElement.classList.add('hidden');
         }
       }
-      // Crosshair only on foot with a gun.
+      // Crosshair only on foot with a gun — never in a staged screenshot,
+      // where it lands on the player character's back.
       const cross = el('crosshair');
-      if (cross) cross.style.display = (!p.vehicle && p.weapon !== 'fists') ? '' : 'none';
+      if (cross) cross.style.display = (!p.vehicle && p.weapon !== 'fists' && !world.shotMode) ? '' : 'none';
       // District + clock.
       el('district').textContent = districtAt(p.x, p.z);
       const dayFrac = (world.time % 480) / 480;
